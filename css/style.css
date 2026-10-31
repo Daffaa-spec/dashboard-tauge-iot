@@ -1725,3 +1725,32 @@ body.page-settings .footnote {
     flex: 0 0 40px;
   }
 }
+
+@media (max-width: 650px) {
+  .nav a[href="riwayat.html"] .nav-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 25px;
+    height: 25px;
+    font-size: 0;
+  }
+  .nav a[href="riwayat.html"] .nav-icon::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    border: 2.5px solid currentColor;
+    border-radius: 50%;
+  }
+  .nav a[href="riwayat.html"] .nav-icon::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 12px;
+    width: 5px;
+    height: 6px;
+    border-left: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    border-bottom-left-radius: 1px;
+  }
+}
