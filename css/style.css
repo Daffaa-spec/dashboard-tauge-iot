@@ -1520,7 +1520,9 @@ body.page-settings .footnote {
     display: grid;
     justify-items: center;
     gap: 0;
-    padding: 4px 9px;
+    align-content: center;
+    min-height: 50px;
+    padding: 4px 6px;
     font-size: 9px;
     min-width: 55px;
   }
@@ -1528,7 +1530,8 @@ body.page-settings .footnote {
     display: block;
   }
   .nav-icon {
-    font-size: 18px;
+    font-size: 23px;
+    line-height: 1.15;
   }
   .app main {
     padding: 22px 15px 28px;
