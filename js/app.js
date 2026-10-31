@@ -592,19 +592,20 @@ function drawChart() {
 
     c.beginPath();
     c.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      const previous = points[i - 1];
-      const current = points[i];
-      const beforePrevious = points[i - 2] || previous;
-      const afterCurrent = points[i + 1] || current;
-      c.bezierCurveTo(
-        previous.x + (current.x - beforePrevious.x) / 6,
-        previous.y + (current.y - beforePrevious.y) / 6,
-        current.x - (afterCurrent.x - previous.x) / 6,
-        current.y - (afterCurrent.y - previous.y) / 6,
-        current.x,
-        current.y,
-      );
+    if (points.length === 2) {
+      c.lineTo(points[1].x, points[1].y);
+    } else if (points.length > 2) {
+      // Quadratic segments keep each control point between adjacent x values,
+      // avoiding the loops that non-uniform Bézier control points can create.
+      for (let i = 1; i < points.length - 1; i++) {
+        const current = points[i];
+        const next = points[i + 1];
+        const midpointX = (current.x + next.x) / 2;
+        const midpointY = (current.y + next.y) / 2;
+        c.quadraticCurveTo(current.x, current.y, midpointX, midpointY);
+      }
+      const last = points.at(-1);
+      c.quadraticCurveTo(last.x, last.y, last.x, last.y);
     }
     c.strokeStyle = color;
     c.lineWidth = 2.2;
