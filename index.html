@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f7f1" />
+    <title>Tauge IoT — Dashboard Penyiraman</title>
+    <link rel="stylesheet" href="css/style.css?v=15" />
+  </head>
+  <body>
+    <div class="app">
+      <aside>
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="28" height="28" fill="none"><path d="M24 37V23" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><path d="M23 26C14 26 10 20 11 12c8 0 13 4 13 11" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 23c0-8 6-13 14-12 0 8-4 13-13 14" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 37h12" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></div>
+          <div class="brand-copy">
+            <strong>Tauge IoT</strong><small>Smart growing system</small>
+          </div>
+        </div>
+        <div>
+          <p class="nav-label">Menu utama</p>
+          <nav class="nav" aria-label="Menu utama">
+            <a class="active" href="index.html"
+              ><span class="nav-icon">▦</span><span>Ringkasan</span></a
+            >
+            <a href="sensor.html"
+              ><span class="nav-icon">◉</span><span>Sensor</span></a
+            >
+            <a href="riwayat.html"
+              ><span class="nav-icon">◷</span><span>Riwayat</span></a
+            >
+            <a href="settings.html"
+              ><span class="nav-icon">&#9881;</span><span>Settings</span></a
+            >
+          </nav>
+        </div>
+        <div class="side-bottom">
+          <p class="nav-label">Perangkat</p>
+          <div class="device-mini">
+            <span class="dot offline"></span> <strong>ESP32 · Offline</strong>
+            <p>Tidak terhubung</p>
+          </div>
+        </div>
+      </aside>
+      <main id="ringkasan">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Pemantauan tanaman tauge</p>
+            <h1>Dashboard</h1>
+          </div>
+          <div class="top-actions">
+            <div class="connection">
+              <span class="live-dot"></span
+              ><span id="connectionText"
+                >Mode demo · Firebase belum diatur</span
+              >
+            </div>
+            <button
+              class="icon-btn"
+              id="refreshBtn"
+              title="Muat ulang data"
+              aria-label="Muat ulang data"
+            >
+              ↻
+            </button>
+          </div>
+        </header>
+        <section class="welcome">
+          <div>
+            <h2>Halo, selamat datang 👋</h2>
+            <p>Pantau kondisi lingkungan dan kendalikan penyiraman tauge.</p>
+          </div>
+          <div class="date-pill" id="today"></div>
+        </section>
+
+        <div class="section-head" id="sensor">
+          <div>
+            <h2>Kondisi saat ini</h2>
+            <p>Pembacaan terakhir dari sensor SHT32 dan ESP32</p>
+          </div>
+        </div>
+        <section class="grid" aria-label="Ringkasan sensor">
+          <article class="card">
+            <div class="metric-top">
+              <div class="metric-icon">🌡️</div>
+              <span class="tag">SHT32</span>
+            </div>
+            <p class="metric-label">Suhu udara</p>
+            <div class="metric-value" id="temperature">
+              --<small> °C</small>
+            </div>
+            <div class="metric-note" id="temperatureNote">
+              Menunggu data sensor
+            </div>
+          </article>
+          <article class="card">
+            <div class="metric-top">
+              <div class="metric-icon humidity">💧</div>
+              <span class="tag">SHT32</span>
+            </div>
+            <p class="metric-label">Kelembapan udara</p>
+            <div class="metric-value" id="humidity">--<small> %</small></div>
+            <div class="metric-note" id="humidityNote">
+              Menunggu data sensor
+            </div>
+          </article>
+          <article class="card pump-card">
+            <div>
+              <div class="metric-top">
+                <div class="metric-icon pump">🚿</div>
+                <span class="tag" id="pumpTag">POMPA</span>
+              </div>
+              <p class="metric-label">Status pompa</p>
+              <div class="metric-value" id="pumpValue">--</div>
+              <div class="metric-note" id="pumpUpdated">
+                Belum ada pembaruan
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <div class="section-head" id="chartSection">
+          <div>
+            <h2>Grafik sensor</h2>
+            <p>Perubahan suhu dan kelembapan udara</p>
+          </div>
+          <div class="chart-tools">
+            <button class="selected" data-range="24">24 jam</button
+            ><button data-range="7">7 hari</button>
+          </div>
+        </div>
+        <section class="content-grid">
+          <article class="card chart-card">
+            <div class="legend">
+              <span><i></i>Suhu (°C)</span><span><i></i>Kelembapan (%)</span>
+            </div>
+            <div class="chart-wrap">
+              <canvas
+                id="sensorChart"
+                aria-label="Grafik suhu dan kelembapan"
+                role="img"
+              ></canvas>
+            </div>
+          </article>
+          <article class="card control-card" id="kontrol">
+            <div class="control-header">
+              <div>
+                <h3>Kontrol penyiraman</h3>
+                <p>Pilih cara kerja sistem pompa</p>
+              </div>
+              <span class="metric-icon pump">⚙️</span>
+            </div>
+            <div class="mode" role="group" aria-label="Mode penyiraman">
+              <button class="selected" data-mode="auto">Otomatis</button
+              ><button data-mode="manual">Manual</button>
+            </div>
+            <div class="pump-status">
+              <div class="pump-status-label">
+                Pompa
+                <small id="modeDescription"
+                  >Dikendalikan otomatis oleh ESP32</small
+                >
+              </div>
+              <span class="live-dot" id="pumpDot"></span>
+            </div>
+            <button class="pump-button" id="pumpAction" disabled>
+              Menunggu koneksi Firebase
+            </button>
+            <p class="auto-note" id="modeNote">
+              Mode otomatis mengikuti aturan yang dijalankan ESP32. Atur logika
+              penyiraman pada firmware sesuai sistem yang digunakan.
+            </p>
+          </article>
+        </section>
+
+        <div class="section-head" id="riwayat">
+          <div>
+            <h2>Aktivitas terbaru</h2>
+            <p>Catatan pembacaan dan perubahan status perangkat</p>
+          </div>
+        </div>
+        <section class="lower-grid">
+          <article class="card">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>WAKTU</th>
+                    <th>SUHU</th>
+                    <th>KELEMBAPAN</th>
+                    <th>POMPA</th>
+                  </tr>
+                </thead>
+                <tbody id="historyRows">
+                  <tr>
+                    <td colspan="4" class="empty">
+                      Data akan muncul setelah Firebase terhubung.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+          <article class="card">
+            <h3 style="font-size: 14px; margin: 0">Status perangkat</h3>
+            <div class="activity">
+              <div class="activity-row">
+                <div class="activity-icon">▣</div>
+                <div>
+                  <p>ESP32</p>
+                  <small id="espStatus">Menunggu koneksi</small>
+                </div>
+              </div>
+              <div class="activity-row">
+                <div class="activity-icon">◉</div>
+                <div>
+                  <p>Sensor SHT32</p>
+                  <small id="sensorStatus">Menunggu pembacaan</small>
+                </div>
+              </div>
+              <div class="activity-row">
+                <div class="activity-icon">⏻</div>
+                <div>
+                  <p>XY-MOS · Pompa 5V</p>
+                  <small id="relayStatus">Menunggu status relay</small>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+        <p class="footnote">
+          Tauge IoT · Monitoring suhu, kelembapan udara, dan penyiraman
+        </p>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <!-- Firebase compat SDK: masukkan konfigurasi project Firebase milikmu di bagian script. -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="js/app.js?v=31"></script>
+  </body>
+</html>

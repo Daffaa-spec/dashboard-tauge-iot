@@ -1,0 +1,9 @@
+# Berkas perangkat keras dan kredensial tidak perlu diterbitkan sebagai website.
+firebase_secrets.h
+**/firebase_secrets.h
+firebase_root_ca.h
+**/firebase_root_ca.h
+TaugeIoT_Firebase/
+WiFi_Connection_Test/
+*.ino
+database.rules.json

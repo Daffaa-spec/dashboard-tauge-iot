@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f7f1" />
+    <title>Tauge IoT — Settings Firmware</title>
+    <link rel="stylesheet" href="css/style.css?v=15" />
+  </head>
+  <body class="page-settings">
+    <div class="app">
+      <aside>
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="28" height="28" fill="none"><path d="M24 37V23" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><path d="M23 26C14 26 10 20 11 12c8 0 13 4 13 11" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 23c0-8 6-13 14-12 0 8-4 13-13 14" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 37h12" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></div>
+          <div class="brand-copy">
+            <strong>Tauge IoT</strong><small>Smart growing system</small>
+          </div>
+        </div>
+        <div>
+          <p class="nav-label">Menu utama</p>
+          <nav class="nav" aria-label="Menu utama">
+            <a href="index.html"
+              ><span class="nav-icon">▦</span><span>Ringkasan</span></a
+            >
+            <a href="sensor.html"
+              ><span class="nav-icon">◉</span><span>Sensor</span></a
+            >
+            <a href="riwayat.html"
+              ><span class="nav-icon">◷</span><span>Riwayat</span></a
+            >
+            <a class="active" href="settings.html"
+              ><span class="nav-icon">&#9881;</span><span>Settings</span></a
+            >
+          </nav>
+        </div>
+        <div class="side-bottom">
+          <p class="nav-label">Perangkat</p>
+          <div class="device-mini">
+            <span class="dot offline"></span> <strong>ESP32 · Offline</strong>
+            <p>Tidak terhubung</p>
+          </div>
+        </div>
+      </aside>
+      <main id="ringkasan">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Pemantauan tanaman tauge</p>
+            <h1>Settings</h1>
+          </div>
+          <div class="top-actions">
+            <div class="connection">
+              <span class="live-dot"></span
+              ><span id="connectionText"
+                >Mode demo · Firebase belum diatur</span
+              >
+            </div>
+            <button
+              class="icon-btn"
+              id="refreshBtn"
+              title="Muat ulang data"
+              aria-label="Muat ulang data"
+            >
+              ↻
+            </button>
+          </div>
+        </header>
+
+        <section class="settings-page-content" aria-labelledby="otaPageTitle">
+          <div class="settings-title-row">
+            <div class="settings-title-icon">▣</div>
+            <div>
+              <h2 id="otaPageTitle">Update Firmware ESP32 (OTA)</h2>
+              <p>
+                Perbarui firmware perangkat lewat Wi-Fi lokal, tanpa melepas
+                kabel sensor atau pompa.
+              </p>
+            </div>
+          </div>
+
+          <div class="ota-summary-grid">
+            <article class="card ota-device-card">
+              <div class="ota-card-heading">
+                <span class="ota-icon green">▣</span>
+                <div>
+                  <h3>ESP32 Device</h3>
+                  <small id="otaDeviceState">Menunggu koneksi</small>
+                </div>
+              </div>
+              <dl class="ota-device-details">
+                <div>
+                  <dt>Nama perangkat</dt>
+                  <dd>esp32-01</dd>
+                </div>
+                <div>
+                  <dt>Alamat IP</dt>
+                  <dd id="otaDeviceIpSummary">Belum terdeteksi</dd>
+                </div>
+                <div>
+                  <dt>MAC Address</dt>
+                  <dd id="otaDeviceMac">—</dd>
+                </div>
+                <div>
+                  <dt>Waktu aktif</dt>
+                  <dd id="otaDeviceUptime">—</dd>
+                </div>
+              </dl>
+            </article>
+            <article class="card ota-version-card">
+              <div class="ota-card-heading">
+                <span class="ota-icon blue">▱</span>
+                <div>
+                  <h3>Firmware saat ini</h3>
+                  <small>Versi terpasang pada ESP32</small>
+                </div>
+              </div>
+              <strong class="ota-version-value" id="otaCurrentVersion"
+                >Belum diketahui</strong
+              >
+              <small id="otaCurrentBuild"
+                >Informasi versi tersedia setelah firmware OTA diunggah</small
+              >
+            </article>
+            <article class="card ota-version-card ota-latest-card">
+              <div class="ota-card-heading">
+                <span class="ota-icon blue">☁</span>
+                <div>
+                  <h3>Firmware dipilih</h3>
+                  <small>File pembaruan lokal</small>
+                </div>
+              </div>
+              <strong class="ota-version-value" id="otaSelectedVersion"
+                >Belum ada file</strong
+              >
+              <small id="otaSelectedBuild"
+                >Pilih file firmware berekstensi .bin</small
+              >
+            </article>
+          </div>
+
+          <div class="ota-work-grid">
+            <article class="card ota-upload-card">
+              <div class="ota-section-heading">
+                <span class="ota-icon green">⇧</span>
+                <div>
+                  <h3>Update Firmware</h3>
+                  <p>Pilih file firmware untuk perangkat ESP32</p>
+                </div>
+              </div>
+
+              <label class="ota-field-label" for="otaDeviceAddress"
+                >Alamat ESP32</label
+              >
+              <div class="ota-address-row">
+                <span>http://</span
+                ><input
+                  id="otaDeviceAddress"
+                  type="text"
+                  inputmode="url"
+                  placeholder="192.168.43.175"
+                  autocomplete="off"
+                /><button
+                  type="button"
+                  class="ota-secondary-btn"
+                  id="otaDetectButton"
+                >
+                  Deteksi
+                </button>
+              </div>
+              <small class="ota-hint"
+                >Laptop dan ESP32 harus berada di jaringan Wi-Fi yang
+                sama.</small
+              >
+
+              <label class="ota-field-label" for="otaPassword"
+                >Kata sandi OTA</label
+              >
+              <input
+                class="ota-password-input"
+                id="otaPassword"
+                type="password"
+                autocomplete="off"
+                placeholder="Kata sandi yang diatur pada firmware"
+              />
+
+              <input
+                id="otaFirmwareFile"
+                class="visually-hidden"
+                type="file"
+                accept=".bin,application/octet-stream"
+              />
+              <div
+                class="ota-dropzone"
+                id="otaDropzone"
+                role="button"
+                tabindex="0"
+                aria-label="Pilih atau jatuhkan file firmware .bin"
+              >
+                <span class="ota-cloud-icon">☁</span
+                ><strong>Seret file firmware .bin ke sini</strong
+                ><small>atau pilih file dari komputer</small>
+                <button
+                  type="button"
+                  class="ota-primary-btn"
+                  id="otaChooseFile"
+                >
+                  ▱ &nbsp; Pilih File
+                </button>
+              </div>
+
+              <div class="ota-file-summary" id="otaFileSummary" hidden>
+                <span class="ota-file-icon">▤</span>
+                <div class="ota-file-copy">
+                  <strong id="otaFileName">—</strong
+                  ><small id="otaFileSize">—</small>
+                </div>
+                <span class="ota-valid-pill">● Siap</span
+                ><button
+                  class="ota-remove-file"
+                  type="button"
+                  id="otaRemoveFile"
+                  aria-label="Hapus file pilihan"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div class="ota-safety-note">
+                <strong>ℹ Sebelum update</strong
+                ><span
+                  >Pastikan pompa mati, catu daya ESP32 stabil, dan firmware
+                  dibuat untuk board serta skema partisi yang sama.</span
+                >
+              </div>
+              <button
+                type="button"
+                class="ota-start-btn"
+                id="otaStartButton"
+                disabled
+              >
+                ➤ &nbsp; Mulai Update Firmware
+              </button>
+              <p class="ota-upload-message" id="otaUploadMessage" role="status">
+                Pilih file .bin dan sambungkan ke ESP32 untuk memulai.
+              </p>
+            </article>
+
+            <div class="ota-progress-column">
+              <article class="card ota-progress-card">
+                <div class="ota-section-heading">
+                  <span class="ota-icon green">⟳</span>
+                  <div>
+                    <h3>Progress Update</h3>
+                    <p id="otaProgressCaption">Menunggu file firmware</p>
+                  </div>
+                </div>
+                <ol class="ota-steps" aria-label="Tahapan pembaruan firmware">
+                  <li data-ota-step="1">
+                    <span>1</span><strong>Pilih File</strong
+                    ><small>Menunggu</small>
+                  </li>
+                  <li data-ota-step="2">
+                    <span>2</span><strong>Validasi</strong
+                    ><small>Menunggu</small>
+                  </li>
+                  <li data-ota-step="3">
+                    <span>3</span><strong>Update Firmware</strong
+                    ><small>Menunggu</small>
+                  </li>
+                  <li data-ota-step="4">
+                    <span>4</span><strong>Reboot</strong><small>Menunggu</small>
+                  </li>
+                </ol>
+                <div class="ota-progress-track">
+                  <div id="otaProgressBar"></div>
+                </div>
+                <div class="ota-progress-footer">
+                  <span id="otaProgressStatus">Belum dimulai</span
+                  ><strong id="otaProgressPercent">0%</strong>
+                </div>
+                <div class="ota-status-callout" id="otaStatusCallout">
+                  <span>⌁</span>
+                  <div>
+                    <strong id="otaStatusTitle">Siap untuk pembaruan</strong
+                    ><small id="otaStatusDetail"
+                      >Pilih firmware .bin yang sudah dikompilasi dari Arduino
+                      IDE.</small
+                    >
+                  </div>
+                </div>
+              </article>
+
+              <article class="card ota-log-card">
+                <div class="ota-section-heading">
+                  <span class="ota-icon terminal">›_</span>
+                  <div>
+                    <h3>Log Proses</h3>
+                    <p>Catatan proses OTA pada dashboard</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="ota-secondary-btn ota-log-clear"
+                    id="otaClearLog"
+                  >
+                    Bersihkan
+                  </button>
+                </div>
+                <div
+                  class="ota-log-output"
+                  id="otaLogOutput"
+                  aria-live="polite"
+                >
+                  <div>
+                    <time>--:--:--</time><span class="log-info">[INFO]</span>
+                    <p>Menunggu proses update firmware.</p>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+        <section class="welcome">
+          <div>
+            <h2>Halo, selamat datang 👋</h2>
+            <p>Pantau kondisi lingkungan dan kendalikan penyiraman tauge.</p>
+          </div>
+          <div class="date-pill" id="today"></div>
+        </section>
+
+        <div class="section-head" id="sensor">
+          <div>
+            <h2>Kondisi saat ini</h2>
+            <p>Pembacaan terakhir dari sensor SHT32 dan ESP32</p>
+          </div>
+        </div>
+        <section class="grid" aria-label="Ringkasan sensor">
+          <article class="card">
+            <div class="metric-top">
+              <div class="metric-icon">🌡️</div>
+              <span class="tag">SHT32</span>
+            </div>
+            <p class="metric-label">Suhu udara</p>
+            <div class="metric-value" id="temperature">
+              --<small> °C</small>
+            </div>
+            <div class="metric-note" id="temperatureNote">
+              Menunggu data sensor
+            </div>
+          </article>
+          <article class="card">
+            <div class="metric-top">
+              <div class="metric-icon humidity">💧</div>
+              <span class="tag">SHT32</span>
+            </div>
+            <p class="metric-label">Kelembapan udara</p>
+            <div class="metric-value" id="humidity">--<small> %</small></div>
+            <div class="metric-note" id="humidityNote">
+              Menunggu data sensor
+            </div>
+          </article>
+          <article class="card pump-card">
+            <div>
+              <div class="metric-top">
+                <div class="metric-icon pump">🚿</div>
+                <span class="tag" id="pumpTag">POMPA</span>
+              </div>
+              <p class="metric-label">Status pompa 5V</p>
+              <div class="metric-value" id="pumpValue">--</div>
+              <div class="metric-note" id="pumpUpdated">
+                Belum ada pembaruan
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <div class="section-head" id="chartSection">
+          <div>
+            <h2>Grafik sensor</h2>
+            <p>Perubahan suhu dan kelembapan udara</p>
+          </div>
+          <div class="chart-tools">
+            <button class="selected" data-range="24">24 jam</button
+            ><button data-range="7">7 hari</button>
+          </div>
+        </div>
+        <section class="content-grid">
+          <article class="card chart-card">
+            <div class="legend">
+              <span><i></i>Suhu (°C)</span><span><i></i>Kelembapan (%)</span>
+            </div>
+            <div class="chart-wrap">
+              <canvas
+                id="sensorChart"
+                aria-label="Grafik suhu dan kelembapan"
+                role="img"
+              ></canvas>
+            </div>
+          </article>
+          <article class="card control-card" id="kontrol">
+            <div class="control-header">
+              <div>
+                <h3>Kontrol penyiraman</h3>
+                <p>Pilih cara kerja sistem pompa</p>
+              </div>
+              <span class="metric-icon pump">⚙️</span>
+            </div>
+            <div class="mode" role="group" aria-label="Mode penyiraman">
+              <button class="selected" data-mode="auto">Otomatis</button
+              ><button data-mode="manual">Manual</button>
+            </div>
+            <div class="pump-status">
+              <div class="pump-status-label">
+                Pompa
+                <small id="modeDescription"
+                  >Dikendalikan otomatis oleh ESP32</small
+                >
+              </div>
+              <span class="live-dot" id="pumpDot"></span>
+            </div>
+            <button class="pump-button" id="pumpAction" disabled>
+              Menunggu koneksi Firebase
+            </button>
+            <p class="auto-note" id="modeNote">
+              Mode otomatis mengikuti aturan yang dijalankan ESP32. Atur logika
+              penyiraman pada firmware sesuai sistem yang digunakan.
+            </p>
+          </article>
+        </section>
+
+        <div class="section-head" id="riwayat">
+          <div>
+            <h2>Aktivitas terbaru</h2>
+            <p>Catatan pembacaan dan perubahan status perangkat</p>
+          </div>
+        </div>
+        <section class="lower-grid">
+          <article class="card">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>WAKTU</th>
+                    <th>SUHU</th>
+                    <th>KELEMBAPAN</th>
+                    <th>POMPA</th>
+                  </tr>
+                </thead>
+                <tbody id="historyRows">
+                  <tr>
+                    <td colspan="4" class="empty">
+                      Data akan muncul setelah Firebase terhubung.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+          <article class="card">
+            <h3 style="font-size: 14px; margin: 0">Status perangkat</h3>
+            <div class="activity">
+              <div class="activity-row">
+                <div class="activity-icon">▣</div>
+                <div>
+                  <p>ESP32</p>
+                  <small id="espStatus">Menunggu koneksi</small>
+                </div>
+              </div>
+              <div class="activity-row">
+                <div class="activity-icon">◉</div>
+                <div>
+                  <p>Sensor SHT32</p>
+                  <small id="sensorStatus">Menunggu pembacaan</small>
+                </div>
+              </div>
+              <div class="activity-row">
+                <div class="activity-icon">⏻</div>
+                <div>
+                  <p>XY-MOS · Pompa 5V</p>
+                  <small id="relayStatus">Menunggu status relay</small>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+        <p class="footnote">
+          Tauge IoT · Monitoring suhu, kelembapan udara, dan penyiraman
+        </p>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <!-- Firebase compat SDK: masukkan konfigurasi project Firebase milikmu di bagian script. -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <script src="js/app.js?v=31"></script>
+  </body>
+</html>

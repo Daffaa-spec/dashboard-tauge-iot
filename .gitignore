@@ -1,0 +1,6 @@
+# Kredensial lokal untuk ESP32. Jangan unggah ke GitHub.
+firebase_secrets.h
+**/firebase_secrets.h
+
+# Metadata deployment lokal Vercel.
+.vercel/
