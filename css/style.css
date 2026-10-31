@@ -1737,9 +1737,9 @@ body.page-settings .footnote {
   }
   .nav a[href="riwayat.html"] .nav-icon::before {
     content: "";
-    width: 16px;
-    height: 16px;
-    border: 2.5px solid currentColor;
+    width: 19px;
+    height: 19px;
+    border: 2px solid currentColor;
     border-radius: 50%;
   }
   .nav a[href="riwayat.html"] .nav-icon::after {
