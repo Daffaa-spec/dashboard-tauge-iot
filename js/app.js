@@ -488,16 +488,28 @@ function formatTime(value) {
       }).format(d);
 }
 function rememberReading(value) {
-  const timestamp = Number(value.timestamp) || Date.now();
+  const sourceTimestamp = Number(value.timestamp) || Date.now();
+  // Firmware sends live telemetry every 2s and history every 60s. Combine
+  // both into one minute bucket so near-identical timestamps don't bunch up
+  // at the chart's latest edge.
+  const timestamp = Math.floor(sourceTimestamp / 60_000) * 60_000;
   const reading = {
     temperature: Number(value.temperature),
     humidity: Number(value.humidity),
     timestamp,
+    sampleCount: 1,
   };
   if (!Number.isFinite(reading.temperature) || !Number.isFinite(reading.humidity)) return;
   const existing = readings.findIndex((item) => item.timestamp === timestamp);
-  if (existing >= 0) readings[existing] = reading;
-  else readings.push(reading);
+  if (existing >= 0) {
+    const previous = readings[existing];
+    const count = previous.sampleCount || 1;
+    previous.temperature += (reading.temperature - previous.temperature) / (count + 1);
+    previous.humidity += (reading.humidity - previous.humidity) / (count + 1);
+    previous.sampleCount = count + 1;
+  } else {
+    readings.push(reading);
+  }
   readings.sort((a, b) => a.timestamp - b.timestamp);
   readings = readings.slice(-5000);
 }
