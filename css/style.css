@@ -1765,3 +1765,73 @@ body.page-settings .footnote {
     line-height: 1.4;
   }
 }
+
+@media (max-width: 650px) {
+  .topbar {
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .topbar > div:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .eyebrow {
+    font-size: 9px;
+    letter-spacing: 0.055em;
+    line-height: 1.35;
+  }
+  .topbar h1 {
+    font-size: clamp(22px, 6vw, 28px);
+    line-height: 1.12;
+    overflow-wrap: anywhere;
+  }
+  .top-actions {
+    flex: 0 0 auto;
+    gap: 6px;
+  }
+  .connection {
+    box-sizing: border-box;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    justify-content: center;
+    padding: 8px;
+  }
+  .icon-btn {
+    box-sizing: border-box;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+  }
+  .top-actions .auth-signout {
+    box-sizing: border-box;
+    min-height: 40px;
+    height: 40px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar {
+    gap: 6px;
+  }
+  .top-actions {
+    gap: 4px;
+  }
+  .connection,
+  .icon-btn {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+  }
+  .icon-btn {
+    flex-basis: 36px;
+  }
+  .top-actions .auth-signout {
+    height: 36px;
+    min-height: 36px;
+    padding: 0 7px;
+  }
+}
