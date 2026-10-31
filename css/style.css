@@ -963,7 +963,11 @@ body.page-control .chart-card {
     display: none;
   }
   .content-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .content-grid > .card {
+    min-height: 0;
   }
 }
 

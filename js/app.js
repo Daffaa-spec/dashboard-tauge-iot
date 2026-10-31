@@ -533,7 +533,8 @@ function drawChart() {
   c.scale(dpr, dpr);
   const w = rect.width,
     h = rect.height,
-    p = { l: 34, r: 36, t: 14, b: 28 },
+    compactChart = w < 520,
+    p = { l: compactChart ? 32 : 34, r: compactChart ? 44 : 36, t: 14, b: compactChart ? 34 : 28 },
     cw = w - p.l - p.r,
     ch = h - p.t - p.b;
   if (cw <= 0 || ch <= 0) return;
@@ -626,8 +627,14 @@ function drawChart() {
     }
   }
 
+  // Keep the plotted curves and their markers inside the plot, away from axis labels.
+  c.save();
+  c.beginPath();
+  c.rect(p.l, p.t, cw, ch);
+  c.clip();
   drawSeries("temperature", "#26734a", 60);
   drawSeries("humidity", "#69b6d4", 100);
+  c.restore();
 
   if (chartHoverIndex !== null && chartPoints[chartHoverIndex]) {
     const point = chartPoints[chartHoverIndex];
