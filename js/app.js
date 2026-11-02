@@ -16,7 +16,7 @@ const firebaseConfig = {
   measurementId: "G-EX5FNVF0G0",
 };
 const deviceId = "esp32-01";
-const MANUAL_WATERING_COOLDOWN_MS = 3 * 60 * 60 * 1000;
+const MANUAL_WATERING_COOLDOWN_MS = 0; // Jeda dimatikan sementara.
 const DEVICE_OFFLINE_AFTER_MS = 45 * 1000;
 const TELEMETRY_STALE_AFTER_MS = 60 * 1000;
 const paths = {
