@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f5f7f1" />
     <title>Tauge IoT — Dashboard Penyiraman</title>
-    <link rel="stylesheet" href="css/style.css?v=21" />
+    <link rel="stylesheet" href="css/style.css?v=22" />
   </head>
   <body>
     <div class="app">
@@ -162,6 +162,15 @@
               </div>
               <span class="live-dot" id="pumpDot"></span>
             </div>
+            <div class="pump-speed-control">
+              <label for="pumpSpeed">Kecepatan pompa</label>
+              <select id="pumpSpeed" disabled>
+                <option value="25">25%</option>
+                <option value="50">50%</option>
+                <option value="75">75%</option>
+                <option value="100" selected>100%</option>
+              </select>
+            </div>
             <button class="pump-button" id="pumpAction" disabled>
               Menunggu koneksi Firebase
             </button>
@@ -237,6 +246,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-  <script src="js/app.js?v=37"></script>
+  <script src="js/app.js?v=38"></script>
   </body>
 </html>
