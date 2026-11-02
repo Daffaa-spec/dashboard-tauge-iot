@@ -1,7 +1,7 @@
 // Konfigurasi aplikasi web Firebase dan URL Realtime Database.
 // Skema Realtime Database yang digunakan:
 // devices/esp32-01/telemetry/{temperature,humidity,timestamp}
-// devices/esp32-01/control/{mode,pump,pumpSpeedPercent,autoPaused}
+// devices/esp32-01/control/{mode,pump,autoPaused}
 // devices/esp32-01/status/{online,lastSeen}
 // devices/esp32-01/history/{pushId}/{temperature,humidity,pump,timestamp}
 const firebaseConfig = {
@@ -16,7 +16,7 @@ const firebaseConfig = {
   measurementId: "G-EX5FNVF0G0",
 };
 const deviceId = "esp32-01";
-const MANUAL_WATERING_COOLDOWN_MS = 0; // Jeda dimatikan sementara untuk uji pompa.
+const MANUAL_WATERING_COOLDOWN_MS = 3 * 60 * 60 * 1000;
 const DEVICE_OFFLINE_AFTER_MS = 45 * 1000;
 const TELEMETRY_STALE_AFTER_MS = 60 * 1000;
 const paths = {
@@ -29,7 +29,6 @@ let db = null,
   connected = false,
   mode = "auto",
   autoPaused = true,
-  pumpSpeedPercent = 100,
   currentPump = false,
   pumpUpdatedAt = null,
   lastWateringStartedAt = 0,
@@ -532,7 +531,6 @@ function updateAction() {
       ? "Matikan pompa"
       : "Nyalakan pompa";
   $("pumpAction").disabled = !connected || !deviceOnline;
-  if ($("pumpSpeed")) $("pumpSpeed").disabled = !connected || !deviceOnline;
   if (!deviceOnline) $("pumpAction").textContent = "ESP32 offline";
 }
 
@@ -823,9 +821,6 @@ function connectRealtimeDatabase() {
     mode = v.mode || "auto";
     autoPaused = v.autoPaused === undefined ? true : !!v.autoPaused;
     currentPump = !!v.pump;
-    const speedValue = Number(v.pumpSpeedPercent ?? 100);
-    pumpSpeedPercent = [25, 50, 75, 100].includes(speedValue) ? speedValue : 100;
-    if ($("pumpSpeed")) $("pumpSpeed").value = String(pumpSpeedPercent);
     document.querySelectorAll("[data-mode]").forEach((b) =>
       b.classList.toggle("selected", b.dataset.mode === mode),
     );
@@ -987,27 +982,6 @@ document
     b.addEventListener("click", () => changeMode(b.dataset.mode)),
   );
 $("pumpAction").addEventListener("click", handlePumpAction);
-$("pumpSpeed")?.addEventListener("change", async (event) => {
-  const selectedSpeed = Number(event.currentTarget.value);
-  if (![25, 50, 75, 100].includes(selectedSpeed)) return;
-  if (!connected || !deviceOnline) {
-    event.currentTarget.value = String(pumpSpeedPercent);
-    showToast("ESP32 harus online untuk mengubah kecepatan pompa");
-    return;
-  }
-  try {
-    await db.ref(paths.control).update({
-      pumpSpeedPercent: selectedSpeed,
-      updatedAt: firebase.database.ServerValue.TIMESTAMP,
-    });
-    pumpSpeedPercent = selectedSpeed;
-    showToast(`Kecepatan pompa diatur ke ${selectedSpeed}%`);
-  } catch (error) {
-    console.error("Failed to update pump PWM:", error);
-    event.currentTarget.value = String(pumpSpeedPercent);
-    showToast("Gagal mengubah kecepatan pompa. Periksa aturan Firebase.");
-  }
-});
 $("historyShowMore")?.addEventListener("click", () => {
   historyExpanded = !historyExpanded;
   renderHistory(historyCache);
