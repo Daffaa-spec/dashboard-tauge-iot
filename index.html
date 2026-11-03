@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f5f7f1" />
     <title>Tauge IoT — Dashboard Penyiraman</title>
-    <link rel="stylesheet" href="css/style.css?v=23" />
+    <link rel="stylesheet" href="css/style.css?v=24" />
   </head>
   <body>
     <div class="app">
@@ -150,7 +150,7 @@
                 <h3>Kontrol penyiraman</h3>
                 <p>Pilih cara kerja sistem pompa</p>
               </div>
-              <span class="metric-icon pump">⚙️</span>
+              <span class="auto-countdown" id="autoCountdown" aria-label="Hitung mundur penyiraman berikutnya" hidden>--:--:--</span>
             </div>
             <div class="mode" role="group" aria-label="Mode penyiraman">
               <button class="selected" data-mode="auto">Otomatis</button
@@ -240,6 +240,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-  <script src="js/app.js?v=41"></script>
+  <script src="js/app.js?v=42"></script>
   </body>
 </html>

@@ -456,6 +456,25 @@ main {
   color: var(--muted);
   margin: 4px 0 0;
 }
+.auto-countdown {
+  min-width: 76px;
+  min-height: 39px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid #dcebe0;
+  border-radius: 12px;
+  background: #edf7ef;
+  color: #176543;
+  font: 700 13px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.auto-countdown[hidden] {
+  display: none;
+}
 .mode {
   display: flex;
   background: #f0f3ef;

@@ -1,0 +1,38 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "devices": {
+      "esp32-01": {
+        ".read": "auth != null",
+        "control": {
+          ".write": "auth != null",
+          "mode": {
+            ".validate": "newData.val() === 'auto' || newData.val() === 'manual'"
+          },
+          "pump": {
+            ".validate": "newData.isBoolean()"
+          },
+          "autoPaused": {
+            ".validate": "newData.isBoolean()"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "telemetry": {
+          ".write": "auth != null && auth.provider === 'password'"
+        },
+        "status": {
+          ".write": "auth != null && auth.provider === 'password'"
+        },
+        "history": {
+          ".write": "auth != null && auth.provider === 'password'"
+        }
+      }
+    }
+  }
+}

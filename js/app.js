@@ -17,6 +17,7 @@ const firebaseConfig = {
 };
 const deviceId = "esp32-01";
 const MANUAL_WATERING_COOLDOWN_MS = 0; // Jeda dimatikan sementara.
+const AUTO_WATERING_INTERVAL_MS = 180 * 60 * 1000;
 const DEVICE_OFFLINE_AFTER_MS = 45 * 1000;
 const TELEMETRY_STALE_AFTER_MS = 60 * 1000;
 const paths = {
@@ -36,6 +37,7 @@ let db = null,
   currentPump = false,
   pumpUpdatedAt = null,
   lastWateringStartedAt = 0,
+  autoScheduleStartedAt = 0,
   chartRange = 1,
   chartHoverIndex = null,
   chartPoints = [],
@@ -602,23 +604,57 @@ function rememberReading(value) {
 }
 function updateAction() {
   const auto = mode === "auto";
+  updateAutoCountdown();
   $("modeDescription").textContent = auto
     ? "Dikendalikan otomatis oleh ESP32"
     : "Kontrol pompa secara manual";
   $("modeNote").textContent = auto
     ? autoPaused
-      ? "Jadwal otomatis belum berjalan atau sedang dijeda. Klik tombol untuk memulai atau melanjutkan jadwal."
-      : "ESP32 menyiram otomatis setiap 4 jam. Pompa menyala selama 10 detik per siklus."
+      ? "Jadwal otomatis sedang dijeda. Klik tombol untuk menyalakan kembali."
+      : "ESP32 menyiram otomatis setiap 180 menit. Pompa menyala selama 10 detik per siklus."
     : "Mode manual mengirim perintah ke ESP32. Pompa menyala maksimal 10 detik.";
   $("pumpAction").textContent = auto
     ? autoPaused
-      ? "Mulai penyiraman otomatis"
+      ? "Nyalakan jadwal otomatis"
       : "Jeda jadwal otomatis"
     : currentPump
       ? "Matikan pompa"
       : "Nyalakan pompa";
   $("pumpAction").disabled = !connected || !deviceOnline;
   if (!deviceOnline) $("pumpAction").textContent = "ESP32 offline";
+}
+function updateAutoCountdown() {
+  const timer = $("autoCountdown");
+  if (!timer) return;
+  const visible = mode === "auto";
+  timer.hidden = !visible;
+  if (!visible) return;
+  if (autoPaused || !connected || !deviceOnline) {
+    timer.textContent = "--:--:--";
+    return;
+  }
+
+  const uptimeSeconds = Number(latestStatus?.uptimeSeconds);
+  const lastSeenAt = timestampMs(latestStatus?.lastSeen);
+  const bootAt = Number.isFinite(uptimeSeconds) && lastSeenAt > 0
+    ? lastSeenAt - uptimeSeconds * 1000
+    : 0;
+  const wateredThisBoot = lastWateringStartedAt > 0 &&
+    (!bootAt || lastWateringStartedAt >= bootAt - 5000);
+  const lastAnchor = wateredThisBoot
+    ? lastWateringStartedAt
+    : Math.max(autoScheduleStartedAt, bootAt);
+  if (!lastAnchor) {
+    timer.textContent = "--:--:--";
+    return;
+  }
+  const totalSeconds = Math.ceil(
+    Math.max(0, AUTO_WATERING_INTERVAL_MS - (Date.now() - lastAnchor)) / 1000,
+  );
+  const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  timer.textContent = `${hours}:${minutes}:${seconds}`;
 }
 
 function drawChart() {
@@ -947,6 +983,10 @@ function connectRealtimeDatabase() {
     const v = s.val() || {};
     mode = v.mode || "auto";
     autoPaused = v.autoPaused === undefined ? true : !!v.autoPaused;
+    const controlUpdatedAt = timestampMs(v.updatedAt);
+    if (mode === "auto" && !autoPaused && !lastWateringStartedAt && controlUpdatedAt) {
+      autoScheduleStartedAt = controlUpdatedAt;
+    }
     currentPump = !!v.pump;
     document.querySelectorAll("[data-mode]").forEach((b) =>
       b.classList.toggle("selected", b.dataset.mode === mode),
@@ -961,6 +1001,7 @@ function connectRealtimeDatabase() {
   }, handleReadError);
   refreshDeviceStatus();
   setInterval(refreshDeviceStatus, 1000);
+  setInterval(updateAutoCountdown, 1000);
   const historyRef = db.ref(paths.history);
   const historyQuery = document.body.classList.contains("page-history")
     ? historyRef
@@ -989,6 +1030,7 @@ function connectRealtimeDatabase() {
           : automatic ? "Penyiraman selesai. Pompa berhenti menunggu jadwal berikutnya" : "Pompa dimatikan secara manual");
       }
     }
+    updateAutoCountdown();
     drawChart();
     renderHistory(history);
   }, handleReadError);
@@ -1043,6 +1085,9 @@ async function changeMode(next) {
   updateAction();
   if (!connected) return;
   try {
+    if (next === "auto" && !autoPaused && !lastWateringStartedAt) {
+      autoScheduleStartedAt = Date.now();
+    }
     await db
       .ref(paths.control)
       .update({ mode, updatedAt: firebase.database.ServerValue.TIMESTAMP });
@@ -1089,6 +1134,9 @@ async function toggleAutomaticSchedule() {
       updatedAt: firebase.database.ServerValue.TIMESTAMP,
     });
     autoPaused = nextPaused;
+    if (!nextPaused && !lastWateringStartedAt) {
+      autoScheduleStartedAt = Date.now();
+    }
     updateAction();
     showToast(nextPaused ? "Jadwal otomatis dijeda" : "Jadwal otomatis dilanjutkan");
   } catch (error) {
