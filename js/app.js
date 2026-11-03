@@ -25,6 +25,10 @@ const paths = {
   status: `devices/${deviceId}/status`,
   history: `devices/${deviceId}/history`,
 };
+const CHART_SESSION_KEY = "taugeIotChartReadingsV2";
+const CHART_DEVICE_UPTIME_KEY = "taugeIotLastDeviceUptimeV1";
+const CHART_SAMPLE_INTERVAL_MS = 1_000;
+const CHART_MAX_POINTS = 24 * 60 * 60;
 let db = null,
   connected = false,
   mode = "auto",
@@ -32,16 +36,63 @@ let db = null,
   currentPump = false,
   pumpUpdatedAt = null,
   lastWateringStartedAt = 0,
-  chartRange = 24,
+  chartRange = 1,
   chartHoverIndex = null,
   chartPoints = [],
-  readings = [],
+  readings = loadChartSessionReadings(),
   knownHistoryEvents = null,
   deviceOnline = false,
   latestStatus = null,
   latestTelemetry = null,
   historyExpanded = false,
-  historyCache = {};
+  historyCache = {},
+  statusSnapshotReceived = false,
+  chartSaveTimer = null;
+
+function loadChartSessionReadings() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(CHART_SESSION_KEY) || "[]");
+    if (!Array.isArray(saved)) return [];
+    return saved.map((item) => Array.isArray(item) ? {
+      timestamp: item[0], temperature: item[1], humidity: item[2], sampleCount: 1,
+    } : item).filter((item) =>
+      Number.isFinite(Number(item.timestamp)) &&
+      Number.isFinite(Number(item.temperature)) &&
+      Number.isFinite(Number(item.humidity)),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveChartSessionReadings() {
+  clearTimeout(chartSaveTimer);
+  chartSaveTimer = setTimeout(persistChartSessionReadings, 5_000);
+}
+
+function persistChartSessionReadings() {
+  clearTimeout(chartSaveTimer);
+  chartSaveTimer = null;
+  try {
+    // Compact tuples keep a long per-second chart within sessionStorage limits.
+    const compactReadings = readings.map((item) => [
+      item.timestamp,
+      Number(Number(item.temperature).toFixed(2)),
+      Number(Number(item.humidity).toFixed(2)),
+    ]);
+    sessionStorage.setItem(CHART_SESSION_KEY, JSON.stringify(compactReadings));
+  } catch (error) {
+    console.warn("Tidak bisa menyimpan sesi grafik:", error);
+  }
+}
+window.addEventListener("pagehide", persistChartSessionReadings);
+
+function resetChartSession() {
+  readings = [];
+  chartHoverIndex = null;
+  persistChartSessionReadings();
+  drawChart();
+}
 const $ = (id) => document.getElementById(id);
 const isConfigured = !Object.values(firebaseConfig).some((v) =>
   String(v).includes("GANTI_DENGAN"),
@@ -95,15 +146,38 @@ function renderTelemetry() {
   $('humidityNote').textContent = `Terakhir diperbarui ${formatTime(latestTelemetry.timestamp)}`;
   if ($('sensorStatus')) $('sensorStatus').textContent = `Suhu ${temp.toFixed(1)} °C · RH ${hum.toFixed(1)} %`;
 }
+function renderChartUpdatedAt() {
+  const label = $("chartUpdated");
+  if (!label) return;
+  const timestamp = timestampMs(latestTelemetry?.timestamp);
+  label.textContent = timestamp
+    ? `Terakhir diperbarui: ${new Intl.DateTimeFormat("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Jakarta",
+      }).format(new Date(timestamp))} WIB`
+    : "Menunggu data sensor";
+}
 function refreshDeviceStatus() {
   const seenAt = timestampMs(latestStatus?.lastSeen);
   const online = !!latestStatus?.online && seenAt > 0 && Date.now() - seenAt <= DEVICE_OFFLINE_AFTER_MS;
+  const uptimeSeconds = Number(latestStatus?.uptimeSeconds);
+  let rebootDetected = false;
+  if (online && Number.isFinite(uptimeSeconds)) {
+    try {
+      const previousUptime = Number(sessionStorage.getItem(CHART_DEVICE_UPTIME_KEY));
+      rebootDetected = Number.isFinite(previousUptime) && uptimeSeconds < previousUptime;
+      sessionStorage.setItem(CHART_DEVICE_UPTIME_KEY, String(uptimeSeconds));
+    } catch {
+      // The chart still works if browser session storage is unavailable.
+    }
+  }
+  if (rebootDetected || (statusSnapshotReceived && !deviceOnline && online)) {
+    resetChartSession();
+  }
   if (online !== deviceOnline) {
     deviceOnline = online;
-    if (!online) {
-      readings = [];
-      drawChart();
-    }
+    drawChart();
   }
   document.querySelectorAll('.device-mini').forEach((card) => {
     const label = card.querySelector('strong');
@@ -489,10 +563,10 @@ function formatTime(value) {
 }
 function rememberReading(value) {
   const sourceTimestamp = Number(value.timestamp) || Date.now();
-  // Firmware sends live telemetry every 2s and history every 60s. Combine
-  // both into one minute bucket so near-identical timestamps don't bunch up
-  // at the chart's latest edge.
-  const timestamp = Math.floor(sourceTimestamp / 60_000) * 60_000;
+  // Keep one session-only sample per second. Live telemetry updates the
+  // current minute's average; Firebase history is deliberately not replayed
+  // into a new chart session.
+  const timestamp = Math.floor(sourceTimestamp / CHART_SAMPLE_INTERVAL_MS) * CHART_SAMPLE_INTERVAL_MS;
   const reading = {
     temperature: Number(value.temperature),
     humidity: Number(value.humidity),
@@ -511,7 +585,8 @@ function rememberReading(value) {
     readings.push(reading);
   }
   readings.sort((a, b) => a.timestamp - b.timestamp);
-  readings = readings.slice(-5000);
+  readings = readings.slice(-CHART_MAX_POINTS);
+  saveChartSessionReadings();
 }
 function updateAction() {
   const auto = mode === "auto";
@@ -571,9 +646,11 @@ function drawChart() {
   }
 
   const now = Date.now();
-  const rangeMs = (chartRange === 7 ? 7 * 24 : 24) * 60 * 60 * 1000;
+  const rangeMs = chartRange * 60 * 60 * 1000;
   const filterStart = now - rangeMs;
-  const vals = readings.filter((reading) => reading.timestamp >= filterStart && reading.timestamp <= now);
+  const vals = readings
+    .filter((reading) => reading.timestamp >= filterStart && reading.timestamp <= now)
+    .slice(-(chartRange * 60 * 60));
   const data = vals;
   // Zoom to the timestamps we actually have so a few fresh readings don't
   // collapse into a tiny cluster at the edge of a 24-hour/7-day axis.
@@ -581,17 +658,16 @@ function drawChart() {
   const lastTimestamp = Number(data.at(-1)?.timestamp) || now;
   let chartStart = firstTimestamp;
   let chartEnd = lastTimestamp;
-  if (chartEnd - chartStart < 60_000) {
-    chartStart -= 30_000;
-    chartEnd += 30_000;
+  if (chartEnd - chartStart < 4_000) {
+    chartStart -= 2_000;
+    chartEnd += 2_000;
   }
   const chartDuration = chartEnd - chartStart;
   chartPoints = data.map((value, index) => ({
     index,
     value,
-    x: p.l + (data.length === 1
-      ? cw
-      : cw * Math.max(0, Math.min(1, ((Number(value.timestamp) || now) - chartStart) / chartDuration))),
+    // Spread the active session chronologically from left to right.
+    x: p.l + (data.length === 1 ? 0 : cw * (index / (data.length - 1))),
     yTemperature: p.t + ch * (1 - Math.max(0, Math.min(60, Number(value.temperature))) / 60),
     yHumidity: p.t + ch * (1 - Math.max(0, Math.min(100, Number(value.humidity))) / 100),
   }));
@@ -625,6 +701,20 @@ function drawChart() {
     c.lineJoin = "round";
     c.lineCap = "round";
     c.stroke();
+
+    // A few hollow markers echo individual readings without crowding a
+    // per-second chart with thousands of dots.
+    const markerStep = Math.max(1, Math.ceil(points.length / 5));
+    points.forEach((point, index) => {
+      if (index % markerStep !== 0 || index === points.length - 1) return;
+      c.beginPath();
+      c.arc(point.x, point.y, 3.2, 0, Math.PI * 2);
+      c.fillStyle = "#fff";
+      c.fill();
+      c.lineWidth = 1.8;
+      c.strokeStyle = color;
+      c.stroke();
+    });
 
     // Keep a single marker at the latest point so the series stays clean.
     const latest = points.at(-1);
@@ -679,17 +769,29 @@ function drawChart() {
     updateChartTooltip(chartHoverIndex);
   }
 
-  for (let i = 0; i < 4; i++) {
-    const x = p.l + (cw * i) / 3;
-    const date = new Date(chartStart + (chartDuration * i) / 3);
-    const label = chartRange === 24
-      ? new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit" }).format(date)
-      : new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" }).format(date);
+  const labelIndexes = data.length <= 4
+    ? data.map((_, index) => index)
+    : [0, Math.round((data.length - 1) / 3), Math.round(2 * (data.length - 1) / 3), data.length - 1];
+  const visibleTimeLabels = new Set();
+  const showSeconds = chartEnd - chartStart < 60_000;
+  labelIndexes.forEach((index) => {
+    const point = chartPoints[index];
+    if (!point) return;
+    const x = point.x;
+    const date = new Date(Number(point.value.timestamp) || now);
+    const label = new Intl.DateTimeFormat("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      ...(showSeconds ? { second: "2-digit" } : {}),
+      timeZone: "Asia/Jakarta",
+    }).format(date);
+    if (visibleTimeLabels.has(label)) return;
+    visibleTimeLabels.add(label);
     c.fillStyle = "#849087";
     c.textBaseline = "top";
-    c.textAlign = i === 0 ? "left" : i === 3 ? "right" : "center";
+    c.textAlign = index === 0 ? "left" : index === data.length - 1 ? "right" : "center";
     c.fillText(label, x, h - 17, Math.max(30, cw / 3));
-  }
+  });
 }
 function updateChartTooltip(index) {
   const tooltip = $("chartTooltip");
@@ -700,6 +802,8 @@ function updateChartTooltip(index) {
   const time = new Intl.DateTimeFormat("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
+    timeZone: "Asia/Jakarta",
   }).format(new Date(Number(point.value.timestamp) || Date.now()));
   tooltip.innerHTML = `
     <strong class="chart-tooltip-time">${time}</strong>
@@ -814,6 +918,7 @@ function connectRealtimeDatabase() {
       }
     }
     renderTelemetry();
+    renderChartUpdatedAt();
     drawChart();
   }, handleReadError);
   db.ref(paths.control).on("value", (s) => {
@@ -830,6 +935,7 @@ function connectRealtimeDatabase() {
   db.ref(paths.status).on("value", (s) => {
     latestStatus = s.val() || {};
     refreshDeviceStatus();
+    statusSnapshotReceived = true;
   }, handleReadError);
   refreshDeviceStatus();
   setInterval(refreshDeviceStatus, 1000);
@@ -861,7 +967,6 @@ function connectRealtimeDatabase() {
           : automatic ? "Penyiraman selesai. Pompa berhenti menunggu jadwal berikutnya" : "Pompa dimatikan secara manual");
       }
     }
-    Object.values(history).forEach(rememberReading);
     drawChart();
     renderHistory(history);
   }, handleReadError);

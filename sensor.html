@@ -123,15 +123,18 @@
             <h2>Grafik sensor</h2>
             <p>Perubahan suhu dan kelembapan udara</p>
           </div>
-          <div class="chart-tools">
-            <button class="selected" data-range="24">24 jam</button
-            ><button data-range="7">7 hari</button>
+          <div class="chart-tools" role="group" aria-label="Rentang grafik">
+            <button class="selected" data-range="1">1 Jam</button>
+            <button data-range="24">24 Jam</button>
           </div>
         </div>
         <section class="content-grid">
           <article class="card chart-card">
-            <div class="legend">
+            <div class="chart-meta-row">
+              <div class="legend">
               <span><i></i>Suhu (°C)</span><span><i></i>Kelembapan (%)</span>
+              </div>
+              <span class="chart-updated" id="chartUpdated">Menunggu data sensor</span>
             </div>
             <div class="chart-wrap">
               <canvas
