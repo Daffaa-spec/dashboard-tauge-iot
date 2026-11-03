@@ -564,7 +564,7 @@ function formatTime(value) {
 function rememberReading(value) {
   const sourceTimestamp = Number(value.timestamp) || Date.now();
   // Keep one session-only sample per second. Live telemetry updates the
-  // current minute's average; Firebase history is deliberately not replayed
+  // current second's average; Firebase history is deliberately not replayed
   // into a new chart session.
   const timestamp = Math.floor(sourceTimestamp / CHART_SAMPLE_INTERVAL_MS) * CHART_SAMPLE_INTERVAL_MS;
   const reading = {
@@ -574,18 +574,30 @@ function rememberReading(value) {
     sampleCount: 1,
   };
   if (!Number.isFinite(reading.temperature) || !Number.isFinite(reading.humidity)) return;
-  const existing = readings.findIndex((item) => item.timestamp === timestamp);
-  if (existing >= 0) {
-    const previous = readings[existing];
+  const latest = readings.at(-1);
+  if (latest?.timestamp === timestamp) {
+    const previous = latest;
     const count = previous.sampleCount || 1;
     previous.temperature += (reading.temperature - previous.temperature) / (count + 1);
     previous.humidity += (reading.humidity - previous.humidity) / (count + 1);
     previous.sampleCount = count + 1;
-  } else {
+  } else if (!latest || timestamp > latest.timestamp) {
     readings.push(reading);
+  } else {
+    // Handle an out-of-order RTDB event without sorting the entire session.
+    let low = 0;
+    let high = readings.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (readings[middle].timestamp < timestamp) low = middle + 1;
+      else high = middle;
+    }
+    if (readings[low]?.timestamp === timestamp) readings[low] = reading;
+    else readings.splice(low, 0, reading);
   }
-  readings.sort((a, b) => a.timestamp - b.timestamp);
-  readings = readings.slice(-CHART_MAX_POINTS);
+  if (readings.length > CHART_MAX_POINTS) {
+    readings.splice(0, readings.length - CHART_MAX_POINTS);
+  }
   saveChartSessionReadings();
 }
 function updateAction() {
@@ -648,10 +660,20 @@ function drawChart() {
   const now = Date.now();
   const rangeMs = chartRange * 60 * 60 * 1000;
   const filterStart = now - rangeMs;
-  const vals = readings
+  const recentReadings = readings
     .filter((reading) => reading.timestamp >= filterStart && reading.timestamp <= now)
     .slice(-(chartRange * 60 * 60));
-  const data = vals;
+  // The chart is only as wide as the screen. Decimate dense per-second data
+  // for drawing, keeping full-resolution readings in memory/session storage.
+  const maxDrawnPoints = Math.max(500, Math.min(1600, Math.floor(cw * 1.2)));
+  const data = recentReadings.length > maxDrawnPoints
+    ? Array.from({ length: maxDrawnPoints }, (_, index) => {
+        const sourceIndex = Math.round(
+          (index * (recentReadings.length - 1)) / (maxDrawnPoints - 1),
+        );
+        return recentReadings[sourceIndex];
+      })
+    : recentReadings;
   // Zoom to the timestamps we actually have so a few fresh readings don't
   // collapse into a tiny cluster at the edge of a 24-hour/7-day axis.
   const firstTimestamp = Number(data[0]?.timestamp) || now;
