@@ -37,7 +37,6 @@ let db = null,
   currentPump = false,
   pumpUpdatedAt = null,
   lastWateringStartedAt = 0,
-  autoScheduleStartedAt = 0,
   chartRange = 1,
   chartHoverIndex = null,
   chartPoints = [],
@@ -611,7 +610,7 @@ function updateAction() {
   $("modeNote").textContent = auto
     ? autoPaused
       ? "Jadwal otomatis sedang dijeda. Klik tombol untuk menyalakan kembali."
-      : "ESP32 menyiram otomatis setiap 180 menit. Pompa menyala selama 10 detik per siklus."
+      : "ESP32 menyiram saat RH di bawah 75% dan jeda 180 menit terpenuhi. Pompa menyala maksimal 10 detik."
     : "Mode manual mengirim perintah ke ESP32. Pompa menyala maksimal 10 detik.";
   $("pumpAction").textContent = auto
     ? autoPaused
@@ -634,23 +633,13 @@ function updateAutoCountdown() {
     return;
   }
 
-  const uptimeSeconds = Number(latestStatus?.uptimeSeconds);
-  const lastSeenAt = timestampMs(latestStatus?.lastSeen);
-  const bootAt = Number.isFinite(uptimeSeconds) && lastSeenAt > 0
-    ? lastSeenAt - uptimeSeconds * 1000
-    : 0;
-  const wateredThisBoot = lastWateringStartedAt > 0 &&
-    (!bootAt || lastWateringStartedAt >= bootAt - 5000);
-  const lastAnchor = wateredThisBoot
-    ? lastWateringStartedAt
-    : Math.max(autoScheduleStartedAt, bootAt);
-  if (!lastAnchor) {
-    timer.textContent = "--:--:--";
-    return;
-  }
-  const totalSeconds = Math.ceil(
-    Math.max(0, AUTO_WATERING_INTERVAL_MS - (Date.now() - lastAnchor)) / 1000,
+  const lastAnchor = Math.max(
+    lastWateringStartedAt,
+    timestampMs(latestStatus?.lastWateringAt),
   );
+  const elapsedSinceWatering = lastAnchor ? Date.now() - lastAnchor : AUTO_WATERING_INTERVAL_MS;
+  const remainingMs = Math.max(0, AUTO_WATERING_INTERVAL_MS - elapsedSinceWatering);
+  const totalSeconds = Math.ceil(remainingMs / 1000);
   const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
   const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
   const seconds = String(totalSeconds % 60).padStart(2, "0");
@@ -983,10 +972,6 @@ function connectRealtimeDatabase() {
     const v = s.val() || {};
     mode = v.mode || "auto";
     autoPaused = v.autoPaused === undefined ? true : !!v.autoPaused;
-    const controlUpdatedAt = timestampMs(v.updatedAt);
-    if (mode === "auto" && !autoPaused && !lastWateringStartedAt && controlUpdatedAt) {
-      autoScheduleStartedAt = controlUpdatedAt;
-    }
     currentPump = !!v.pump;
     document.querySelectorAll("[data-mode]").forEach((b) =>
       b.classList.toggle("selected", b.dataset.mode === mode),
@@ -996,7 +981,12 @@ function connectRealtimeDatabase() {
   }, handleReadError);
   db.ref(paths.status).on("value", (s) => {
     latestStatus = s.val() || {};
+    lastWateringStartedAt = Math.max(
+      lastWateringStartedAt,
+      timestampMs(latestStatus.lastWateringAt),
+    );
     refreshDeviceStatus();
+    updateAutoCountdown();
     statusSnapshotReceived = true;
   }, handleReadError);
   refreshDeviceStatus();
@@ -1085,9 +1075,6 @@ async function changeMode(next) {
   updateAction();
   if (!connected) return;
   try {
-    if (next === "auto" && !autoPaused && !lastWateringStartedAt) {
-      autoScheduleStartedAt = Date.now();
-    }
     await db
       .ref(paths.control)
       .update({ mode, updatedAt: firebase.database.ServerValue.TIMESTAMP });
@@ -1134,9 +1121,6 @@ async function toggleAutomaticSchedule() {
       updatedAt: firebase.database.ServerValue.TIMESTAMP,
     });
     autoPaused = nextPaused;
-    if (!nextPaused && !lastWateringStartedAt) {
-      autoScheduleStartedAt = Date.now();
-    }
     updateAction();
     showToast(nextPaused ? "Jadwal otomatis dijeda" : "Jadwal otomatis dilanjutkan");
   } catch (error) {

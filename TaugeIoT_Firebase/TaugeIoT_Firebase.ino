@@ -4,8 +4,8 @@
   DEMO_MODE = 1: sends simulated sensor values; never powers the pump pin.
   DEMO_MODE = 0: reads SHT30 and enables the pump output on GPIO25.
 
-  Automatic watering uses a dashboard-configurable timer because this project
-  has no soil-moisture sensor. SHT30 measures air temperature and relative humidity.
+  Automatic watering starts below 75% relative humidity after a 180-minute
+  minimum gap. SHT30 measures air temperature and relative humidity.
 
   Paths used by the dashboard:
   devices/esp32-01/telemetry/{temperature,humidity,timestamp}
@@ -29,6 +29,7 @@
 #include <Adafruit_SHT31.h>
 #include <math.h>
 #include <time.h>
+#include <Preferences.h>
 
 #include "firebase_secrets.h"  // Copy firebase_secrets.h.example and fill it in.
 #include "firebase_root_ca.h"
@@ -59,6 +60,8 @@ constexpr uint8_t FIREBASE_CONTROL_QUEUE_LIMIT = 7;
 constexpr uint32_t WIFI_RETRY_MS = 15000;
 constexpr uint32_t SENSOR_RETRY_MS = 30000;
 constexpr uint32_t HARD_PUMP_LIMIT_MS = 10000;
+constexpr float AUTO_RH_THRESHOLD_PERCENT = 75.0f;
+constexpr uint32_t AUTO_RH_CONFIRM_MS = 30000UL;
 constexpr uint32_t DAY_MS = 24UL * 60UL * 60UL * 1000UL;
 constexpr uint8_t WATERING_HISTORY_CAPACITY = 8;
 
@@ -100,7 +103,7 @@ bool sensorOK = false;
 bool pumpRunning = false;
 bool manualPumpCycle = false;
 bool pumpPwmReady = false;
-bool autoEnabled = true;
+bool autoEnabled = false;
 bool autoPaused = true;
 bool lastPumpRequest = false;
 
@@ -119,6 +122,8 @@ float humidityRH = NAN;
 
 uint32_t pumpStartedAt = 0;
 uint32_t lastWateringAt = 0;
+uint64_t lastWateringEpochMs = 0;
+uint32_t lowHumiditySinceAt = 0;
 uint32_t scheduleStartedAt = 0;
 uint32_t lastSensorReadAt = 0;
 uint32_t lastSensorAttemptAt = 0;
@@ -132,14 +137,6 @@ uint32_t lastQueueWarningAt = 0;
 uint32_t wateringTimesMs[WATERING_HISTORY_CAPACITY] = {0};
 uint8_t wateringCount = 0;
 uint8_t wateringIndex = 0;
-
-uint32_t wateringIntervalMs() {
-#if DEMO_MODE
-  return 60UL * 1000UL;
-#else
-  return (uint32_t)AUTO_INTERVAL_HOURS * 60UL * 60UL * 1000UL;
-#endif
-}
 
 uint32_t pumpRunDurationMs() {
 #if DEMO_MODE
@@ -270,7 +267,21 @@ bool startWatering(const char *reason, bool manual) {
   manualPumpCycle = manual;
   pumpStartedAt = now;
   lastWateringAt = now;
+  const uint64_t wateringEpoch = nowEpochMs();
+  if (wateringEpoch > 0) {
+    lastWateringEpochMs = wateringEpoch;
+  }
   resetAutomaticScheduleClock(now);
+
+#if !DEMO_MODE
+  if (lastWateringEpochMs > 0) {
+    Preferences wateringPrefs;
+    if (wateringPrefs.begin("tauge-iot", false)) {
+      wateringPrefs.putULong64("lastWaterAt", lastWateringEpochMs);
+      wateringPrefs.end();
+    }
+  }
+#endif
 
 #if !DEMO_MODE
   wateringTimesMs[wateringIndex] = now;
@@ -395,22 +406,43 @@ void servicePump(uint32_t now) {
     return;
   }
 
+#if DEMO_MODE
   const uint32_t scheduleAnchor = lastWateringAt != 0
                                       ? lastWateringAt
                                       : scheduleStartedAt;
-  if (autoEnabled &&
-      (uint32_t)(now - scheduleAnchor) >= wateringIntervalMs()) {
-#if DEMO_MODE
+  if (autoEnabled && (uint32_t)(now - scheduleAnchor) >= 60000UL) {
     startWatering("Jadwal demo", false);
-#else
-    const bool gapPassed = lastWateringAt == 0 ||
-                           (uint32_t)(now - lastWateringAt) >= MIN_WATERING_GAP_MS;
-    if (sensorOK && gapPassed &&
-        wateringsInLast24Hours(now) < maxWateringsPerDay()) {
-      startWatering("Jadwal otomatis", false);
-    }
-#endif
   }
+#else
+  if (!autoEnabled || !sensorOK || !isfinite(humidityRH) ||
+      humidityRH >= AUTO_RH_THRESHOLD_PERCENT) {
+    lowHumiditySinceAt = 0;
+    return;
+  }
+
+  if (lowHumiditySinceAt == 0) {
+    lowHumiditySinceAt = now;
+    return;
+  }
+
+  const bool lowRhConfirmed =
+      (uint32_t)(now - lowHumiditySinceAt) >= AUTO_RH_CONFIRM_MS;
+  const bool cooldownPassed = lastWateringAt == 0 ||
+      (uint32_t)(now - lastWateringAt) >= MIN_WATERING_GAP_MS;
+  if (lowRhConfirmed && cooldownPassed &&
+      wateringsInLast24Hours(now) < maxWateringsPerDay()) {
+    startWatering("RH di bawah ambang setelah jeda 180 menit", false);
+    lowHumiditySinceAt = 0;
+  } else if (lowRhConfirmed && !cooldownPassed &&
+             (uint32_t)(now - lastQueueWarningAt) >= 60000UL) {
+    lastQueueWarningAt = now;
+    Serial.println("[AUTO] RH rendah, menunggu jeda 180 menit.");
+  } else if (lowRhConfirmed &&
+             wateringsInLast24Hours(now) >= maxWateringsPerDay() &&
+             (uint32_t)(now - lastQueueWarningAt) >= 60000UL) {
+    lastQueueWarningAt = now;
+    Serial.println("[AUTO] Batas penyiraman 24 jam tercapai.");
+#endif
 }
 
 // ------------------------- Firebase callbacks -------------------------
@@ -492,6 +524,23 @@ void startFirebaseWhenReady() {
     return;
   }
 
+#if !DEMO_MODE
+  Preferences wateringPrefs;
+  if (wateringPrefs.begin("tauge-iot", true)) {
+    lastWateringEpochMs = wateringPrefs.getULong64("lastWaterAt", 0);
+    wateringPrefs.end();
+  }
+  if (lastWateringEpochMs > 0) {
+    const uint64_t currentEpochMs = nowEpochMs();
+    const uint64_t elapsedMs = currentEpochMs >= lastWateringEpochMs
+                                   ? currentEpochMs - lastWateringEpochMs
+                                   : 0;
+    if (elapsedMs < MIN_WATERING_GAP_MS) {
+      lastWateringAt = millis() - (uint32_t)elapsedMs;
+    }
+  }
+#endif
+
   initializeApp(firebaseClient, firebaseApp, getAuth(userAuth),
                 onFirebaseResult, "authTask");
   firebaseApp.getApp<RealtimeDatabase>(Database);
@@ -565,11 +614,12 @@ void publishDeviceStatus(uint32_t now) {
 
   const String ip = WiFi.localIP().toString();
   const String mac = WiFi.macAddress();
-  char json[240];
+  char json[280];
   snprintf(json, sizeof(json),
-           "{\"online\":true,\"lastSeen\":%llu,\"ip\":\"%s\",\"mac\":\"%s\",\"firmwareVersion\":\"%s\",\"uptimeSeconds\":%lu}",
+           "{\"online\":true,\"lastSeen\":%llu,\"ip\":\"%s\",\"mac\":\"%s\",\"firmwareVersion\":\"%s\",\"uptimeSeconds\":%lu,\"lastWateringAt\":%llu}",
            (unsigned long long)nowEpochMs(), ip.c_str(), mac.c_str(),
-           FIRMWARE_VERSION, (unsigned long)(millis() / 1000UL));
+           FIRMWARE_VERSION, (unsigned long)(millis() / 1000UL),
+           (unsigned long long)lastWateringEpochMs);
   Database.set<object_t>(firebaseClient, STATUS_PATH, object_t(json),
                          onFirebaseResult, "statusWrite");
 }
