@@ -442,6 +442,7 @@ void servicePump(uint32_t now) {
              (uint32_t)(now - lastQueueWarningAt) >= 60000UL) {
     lastQueueWarningAt = now;
     Serial.println("[AUTO] Batas penyiraman 24 jam tercapai.");
+  }
 #endif
 }
 
