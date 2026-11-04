@@ -48,10 +48,14 @@ constexpr uint8_t PUMP_SPEED_PERCENT = 100;
 
 // ------------------------- Timing -------------------------
 constexpr uint32_t SENSOR_INTERVAL_MS = 1000;
-constexpr uint32_t CONTROL_POLL_MS = 2000;
-constexpr uint32_t TELEMETRY_INTERVAL_MS = 1000;
+constexpr uint32_t CONTROL_POLL_MS = 5000;
+constexpr uint32_t TELEMETRY_INTERVAL_MS = 2000;
 constexpr uint32_t HISTORY_INTERVAL_MS = 60000;
 constexpr uint32_t STATUS_INTERVAL_MS = 15000;
+// FirebaseClient's default async queue on ESP32 is 10 tasks. Keep background
+// traffic low and reserve queue capacity for control and pump state changes.
+constexpr uint8_t FIREBASE_BACKGROUND_QUEUE_LIMIT = 4;
+constexpr uint8_t FIREBASE_CONTROL_QUEUE_LIMIT = 7;
 constexpr uint32_t WIFI_RETRY_MS = 15000;
 constexpr uint32_t SENSOR_RETRY_MS = 30000;
 constexpr uint32_t HARD_PUMP_LIMIT_MS = 10000;
@@ -123,6 +127,7 @@ uint32_t lastTelemetryAt = 0;
 uint32_t lastHistoryAt = 0;
 uint32_t lastStatusAt = 0;
 uint32_t lastWiFiAttemptAt = 0;
+uint32_t lastQueueWarningAt = 0;
 
 uint32_t wateringTimesMs[WATERING_HISTORY_CAPACITY] = {0};
 uint8_t wateringCount = 0;
@@ -429,6 +434,16 @@ void onFirebaseResult(AsyncResult &result) {
   }
 }
 
+void reportFirebaseQueuePressure(uint32_t now, const char *operation) {
+  if ((uint32_t)(now - lastQueueWarningAt) < 15000UL) {
+    return;
+  }
+  lastQueueWarningAt = now;
+  Serial.printf("[Firebase] Antrean padat (%u tugas); %s ditunda. Heap bebas: %u byte.\n",
+                (unsigned)firebaseClient.taskCount(), operation,
+                (unsigned)ESP.getFreeHeap());
+}
+
 void onControlResult(AsyncResult &result) {
   if (!result.isResult()) {
     return;
@@ -490,6 +505,10 @@ void pollControl(uint32_t now) {
       (uint32_t)(now - lastControlPollAt) < CONTROL_POLL_MS) {
     return;
   }
+  if (firebaseClient.taskCount() >= FIREBASE_CONTROL_QUEUE_LIMIT) {
+    reportFirebaseQueuePressure(now, "poll kontrol");
+    return;
+  }
   lastControlPollAt = now;
   controlPollPending = true;
   Database.get(firebaseClient, CONTROL_PATH, onControlResult, false,
@@ -503,6 +522,11 @@ void publishTelemetry(uint32_t now) {
   }
   lastTelemetryAt = now;
 
+  if (firebaseClient.taskCount() >= FIREBASE_BACKGROUND_QUEUE_LIMIT) {
+    reportFirebaseQueuePressure(now, "telemetry/riwayat");
+    return;
+  }
+
   const uint64_t timestamp = nowEpochMs();
   char json[180];
   snprintf(json, sizeof(json),
@@ -513,6 +537,9 @@ void publishTelemetry(uint32_t now) {
 
   if (timestamp > 0 &&
       (uint32_t)(now - lastHistoryAt) >= HISTORY_INTERVAL_MS) {
+    if (firebaseClient.taskCount() >= FIREBASE_BACKGROUND_QUEUE_LIMIT) {
+      return;
+    }
     lastHistoryAt = now;
     char historyJson[220];
     snprintf(historyJson, sizeof(historyJson),
@@ -526,6 +553,12 @@ void publishTelemetry(uint32_t now) {
 
 void publishDeviceStatus(uint32_t now) {
   if ((uint32_t)(now - lastStatusAt) < STATUS_INTERVAL_MS) {
+    return;
+  }
+  // Heartbeat has higher priority than telemetry/history, but still leave
+  // room for Firebase's auth and control tasks.
+  if (firebaseClient.taskCount() >= FIREBASE_CONTROL_QUEUE_LIMIT) {
+    reportFirebaseQueuePressure(now, "heartbeat");
     return;
   }
   lastStatusAt = now;
